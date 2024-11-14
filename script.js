@@ -1,8 +1,5 @@
 const commentInput = document.getElementById("commentInput");
 const charCounter = document.getElementById("charCounter");
-const commentsContainer = document.getElementById("commentsContainer");
-
-document.addEventListener("DOMContentLoaded", loadCommentsFromLocalStorage);
 
 // Character Counter for New Comment
 commentInput.addEventListener("input", () => {
@@ -10,120 +7,86 @@ commentInput.addEventListener("input", () => {
   charCounter.textContent = `${remaining} characters left`;
 });
 
-// Load Comments from Local Storage
-function loadCommentsFromLocalStorage() {
-  const comments = JSON.parse(localStorage.getItem("comments")) || [];
-  comments.forEach((comment) => {
-    const commentDiv = createCommentElement(comment.text, comment.id, comment.replies);
-    commentsContainer.appendChild(commentDiv);
-  });
-}
-
-// Save Comments to Local Storage
-function saveCommentsToLocalStorage() {
-  const comments = Array.from(commentsContainer.children).map((commentDiv) => {
-    const text = commentDiv.querySelector(".comment-text").textContent;
-    const id = commentDiv.id;
-    const replies = Array.from(commentDiv.querySelector(".replies").children).map(replyDiv => ({
-      text: replyDiv.querySelector(".comment-text").textContent,
-      id: replyDiv.id
-    }));
-    return { text, id, replies };
-  });
-  localStorage.setItem("comments", JSON.stringify(comments));
-}
-
 // Add a New Comment
 function addComment() {
   const commentText = commentInput.value.trim();
   if (commentText) {
-    const commentId = `comment-${Date.now()}`;
-    const commentDiv = createCommentElement(commentText, commentId);
-    commentsContainer.appendChild(commentDiv);
+    const commentDiv = createCommentElement(commentText);
+    document.getElementById("commentsContainer").appendChild(commentDiv);
     commentInput.value = "";
     charCounter.textContent = "250 characters left";
-    saveCommentsToLocalStorage();
   }
 }
 
 // Create Comment or Reply Element
-function createCommentElement(text, id = `comment-${Date.now()}`, replies = []) {
+function createCommentElement(text, level = 1) {
   const commentDiv = document.createElement("div");
   commentDiv.classList.add("p-4", "border", "border-gray-200", "rounded-md", "bg-gray-50", "space-y-3", "relative");
-  commentDiv.id = id;
+  commentDiv.setAttribute("data-level", level);
 
   commentDiv.innerHTML = `
-        <p class="text-gray-700 comment-text">${text}</p>
-        <div class="flex space-x-3">
-          <button onclick="editComment('${id}')" class="text-green-500 font-medium text-sm">Edit</button>
-          <button onclick="deleteComment('${id}')" class="text-red-500 font-medium text-sm">Delete</button>
-          <button onclick="toggleReplyInput('${id}')" class="text-blue-500 font-medium text-sm">Reply</button>
-        </div>
-        <div class="replies ml-6 space-y-3"></div>
-      `;
-
-  replies.forEach(reply => {
-    const replyDiv = createCommentElement(reply.text, reply.id, []);
-    commentDiv.querySelector(".replies").appendChild(replyDiv);
-  });
+    <p class="text-gray-700 comment-text">${text}</p>
+    <div class="flex space-x-3">
+      <button onclick="editComment(this)" class="text-green-500 font-medium text-sm">Edit</button>
+      <button onclick="deleteComment(this)" class="text-red-500 font-medium text-sm">Delete</button>
+      <button onclick="toggleReplyInput(this)" class="text-blue-500 font-medium text-sm">Reply</button>
+    </div>
+    <div class="replies ml-6 space-y-3"></div>
+  `;
 
   return commentDiv;
 }
 
 // Edit Comment or Reply
-function editComment(commentId) {
-  const commentDiv = document.getElementById(commentId);
-  const commentText = commentDiv.querySelector(".comment-text");
+function editComment(button) {
+  const commentText = button.closest("div").previousElementSibling;
   const currentText = commentText.textContent;
   const newInput = document.createElement("textarea");
   newInput.classList.add("w-full", "p-2", "border", "rounded", "resize-none", "focus:outline-none", "focus:ring-2", "focus:ring-blue-500");
   newInput.value = currentText;
   commentText.replaceWith(newInput);
 
-  const editButton = commentDiv.querySelector("button");
-  editButton.textContent = "Post";
-  editButton.setAttribute("onclick", `postEdit('${commentId}')`);
+  // Update buttons
+  button.textContent = "Post";
+  button.setAttribute("onclick", "postEdit(this)");
 }
 
 // Post Edited Comment or Reply
-function postEdit(commentId) {
-  const commentDiv = document.getElementById(commentId);
-  const newText = commentDiv.querySelector("textarea").value;
+function postEdit(button) {
+  const newText = button.closest("div").previousElementSibling.value;
   const newCommentText = document.createElement("p");
   newCommentText.classList.add("text-gray-700", "comment-text");
   newCommentText.textContent = newText;
-  commentDiv.querySelector("textarea").replaceWith(newCommentText);
+  button.closest("div").previousElementSibling.replaceWith(newCommentText);
 
-  const editButton = commentDiv.querySelector("button");
-  editButton.textContent = "Edit";
-  editButton.setAttribute("onclick", `editComment('${commentId}')`);
-  saveCommentsToLocalStorage();
+  // Restore button text
+  button.textContent = "Edit";
+  button.setAttribute("onclick", "editComment(this)");
 }
 
 // Delete Comment or Reply
-function deleteComment(commentId) {
-  const commentDiv = document.getElementById(commentId);
-  commentDiv.remove();
-  saveCommentsToLocalStorage();
+function deleteComment(button) {
+  button.closest(".p-4").remove();
 }
 
 // Toggle Reply Input
-function toggleReplyInput(commentId) {
-  const commentDiv = document.getElementById(commentId);
-  let replyInputDiv = commentDiv.querySelector(".reply-input");
+function toggleReplyInput(button) {
+  const commentDiv = button.closest(".p-4");
+  const replyInputDiv = commentDiv.querySelector(".reply-input");
 
   if (!replyInputDiv) {
-    replyInputDiv = document.createElement("div");
-    replyInputDiv.classList.add("reply-input", "mt-3");
-    replyInputDiv.innerHTML = `
-          <textarea maxlength="250" class="w-full p-2 border rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2" placeholder="Write a reply..."></textarea>
-          <p class="text-right text-gray-500 text-sm">250 characters left</p>
-          <button onclick="addReply('${commentId}')" class="mt-2 px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Post Reply</button>
-        `;
-    commentDiv.querySelector(".replies").appendChild(replyInputDiv);
+    const replyInput = document.createElement("div");
+    replyInput.classList.add("reply-input", "mt-3");
+    replyInput.innerHTML = `
+      <textarea maxlength="250" class="w-full p-2 border rounded resize-none focus:outline-none focus:ring-2 focus:ring-blue-500" rows="2" placeholder="Write a reply..."></textarea>
+      <p class="text-right text-gray-500 text-sm">250 characters left</p>
+      <button onclick="addReply(this)" class="mt-2 px-4 py-1 bg-blue-500 text-white rounded hover:bg-blue-600">Post</button>
+    `;
+    commentDiv.querySelector(".replies").appendChild(replyInput);
 
-    const replyTextarea = replyInputDiv.querySelector("textarea");
-    const replyCharCounter = replyInputDiv.querySelector("p");
+    // Character counter for reply input
+    const replyTextarea = replyInput.querySelector("textarea");
+    const replyCharCounter = replyInput.querySelector("p");
     replyTextarea.addEventListener("input", () => {
       const remaining = 250 - replyTextarea.value.length;
       replyCharCounter.textContent = `${remaining} characters left`;
@@ -133,19 +96,19 @@ function toggleReplyInput(commentId) {
   }
 }
 
-// Add Reply with Infinite Nesting
-function addReply(parentId) {
-  const parentDiv = document.getElementById(parentId);
-  const replyInput = parentDiv.querySelector(".reply-input textarea");
-  const replyText = replyInput.value.trim();
 
+// Add Reply with Edit, Delete, and Reply Options
+function addReply(button, level) {
+  const replyInput = button.previousElementSibling.previousElementSibling;
+  const replyText = replyInput.value.trim();
   if (replyText) {
-    const replyId = `reply-${Date.now()}`;
-    const replyDiv = createCommentElement(replyText, replyId, []);
-    parentDiv.querySelector(".replies").appendChild(replyDiv);
+    const replyDiv = createCommentElement(replyText, level);
+    const repliesContainer = button.closest(".replies");
+    repliesContainer.appendChild(replyDiv);
     replyInput.value = "";
-    replyInput.nextElementSibling.textContent = "250 characters left";
-    parentDiv.querySelector(".reply-input").remove();
-    saveCommentsToLocalStorage();
+    button.closest(".reply-input").remove();
+
+    // Handle reply visibility
+    limitRepliesVisibility(repliesContainer);
   }
 }
